@@ -1,1 +1,1 @@
-# natural-language-query
+An experiment that places AI in the driver's seat and let's it roam a database to answer queries.
