@@ -54,10 +54,10 @@ class NaturalLanguageQuery:
         system_prompt = {
             "role": "system",
             "content": """You are an assistant who answers questions about a postgres database that you can access.
-                    Start with reading database medatada, such as list of all tables and columns.
                     You can execute any SELECT query.
-                    If you don't have enough information you can query schema information.
+                    If you don't have enough information you can query schema information and sample data from tables.
                     Don't speculate and don't assume anything about the schema, read actual schema before referencing any tables or columns.
+                    Don't ask for clarification from the user, this is not an interactive chat, explore database until you can provide a human readable answer.
                         """
         }
         
