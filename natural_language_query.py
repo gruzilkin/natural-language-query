@@ -46,6 +46,29 @@ class NaturalLanguageQuery:
             "ROLLBACK"
         ]
 
+        self.messages = []
+
+        self._initialize_ai()
+
+    def _initialize_ai(self):
+        system_prompt = {
+            "role": "system",
+            "content": """You are an assistant who answers questions about a postgres database that you can access.
+                    Start with reading database medatada, such as list of all tables and columns.
+                    You can execute any SELECT query.
+                    If you don't have enough information you can query schema information.
+                    Don't speculate and don't assume anything about the schema, read actual schema before referencing any tables or columns.
+                        """
+        }
+        
+        self.messages.append(system_prompt)
+
+        schema = self._execute_sql_query("SELECT table_schema, table_name FROM information_schema.tables")
+        self.messages.append({
+            "role": "user",
+            "content": schema
+        })
+
     def _execute_sql_query(self, sql_query):
         """
         Executes an arbitrary SQL query on a PostgreSQL database.
@@ -85,28 +108,17 @@ class NaturalLanguageQuery:
                 conn.close()
 
     def run_query(self, query: str):
-        system_prompt = {
-            "role": "system",
-            "content": """You are an assistant who answers questions about a postgres database that you can access.
-                    You can execute any SELECT query.
-                    If you don't have enough information you can query schema information.
-                    Don't speculate and don't assume anything about the schema, read actual schema before referencing any tables or columns.
-                        """
-        }
         
-        messages = [
-            system_prompt,
-            {
-                "role": "user",
-                "content": query
-            }
-        ]
+        self.messages.append({
+            "role": "user",
+            "content": query
+        })
 
         while True:
             response = self.client.chat.completions.create(
                 model=self.model,
                 temperature=0,
-                messages=messages,
+                messages=self.messages,
                 tools=self.tools_definition,
                 tool_choice="auto",
             )
@@ -116,7 +128,7 @@ class NaturalLanguageQuery:
             if message.content:
                 print(message.content)
                 
-            messages.append(message)
+            self.messages.append(message)
 
             if message.tool_calls:
                 for tool_call in message.tool_calls:
@@ -130,7 +142,7 @@ class NaturalLanguageQuery:
 
                     # Append the result from tool function call to the chat message history,
                     # with "role": "tool"
-                    messages.append(
+                    self.messages.append(
                         {
                             "role": "tool",
                             "content": json.dumps(result),
