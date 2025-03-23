@@ -54,7 +54,7 @@ class NaturalLanguageQuery:
         system_prompt = {
             "role": "system",
             "content": """You are an assistant who answers questions about a postgres database that you can access.
-                    You can execute any SELECT query.
+                    You can execute any SELECT query using execute_sql_query tool.
                     If you don't have enough information you can query schema information and sample data from tables.
                     Don't speculate and don't assume anything about the schema, read actual schema before referencing any tables or columns.
                     Don't ask for clarification from the user, this is not an interactive chat, explore database until you can provide a human readable answer.
@@ -114,13 +114,19 @@ class NaturalLanguageQuery:
             "content": query
         })
 
+        # First iteration: Force tool usage to start database exploration
+        force_tool = True
+
         while True:
+            # Use different tool_choice strategy based on iteration
+            tool_choice_param = {"type": "function", "function": {"name": "execute_sql_query"}} if force_tool else "auto"
+            
             response = self.client.chat.completions.create(
                 model=self.model,
                 temperature=0,
                 messages=self.messages,
                 tools=self.tools_definition,
-                tool_choice="auto",
+                tool_choice=tool_choice_param,
             )
 
             message = response.choices[0].message
@@ -130,9 +136,11 @@ class NaturalLanguageQuery:
                 
             self.messages.append(message)
 
+            # After first iteration, let the model decide whether to use tools
+            force_tool = False
+
             if message.tool_calls:
                 for tool_call in message.tool_calls:
-
                     # Get the tool function name and arguments Grok wants to call
                     function_name = tool_call.function.name
                     function_args = json.loads(tool_call.function.arguments)
@@ -150,4 +158,5 @@ class NaturalLanguageQuery:
                         }
                     )
             else:
+                # If no tool calls, we have our final answer
                 return message.content
